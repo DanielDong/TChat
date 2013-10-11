@@ -1,0 +1,105 @@
+
+@(title: String)(content: Html)
+<!DOCTYPE html>
+<html>
+<head>
+	<title>@title</title>
+	<meta charset="utf-8">
+	<link rel="stylesheet" type="text/css" href="@routes.Assets.at("bootstrap/css/bootstrap.css")">
+</head>
+
+<body>
+	
+
+	<div class="container">
+		<!-- The navigation bar-->
+		<div class="navbar navbar-default navbar-fixed-top">
+            <div class="container">
+
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="#">T-Chat</a>
+            </div>
+
+            <div class="navbar-collapse collapse">
+                <ul class="nav navbar-nav">
+                    <li class="active"><a href="#">Home</a></li>
+                    <li><a href="#">Item1</a></li>
+                    <li><a href="#">About</a></li>
+                    <li><a href="#">Contact</a></li>
+                  </ul>
+            </div>
+            </div>
+        </div>
+
+        <!-- The marketing area-->
+		<div class="jumbotron">
+    		<font size="20"><b>T-Chat</b></font> the easiest way of chat ever!
+    		<p>Simply add your friends' email addresses to the following box and create a tempoary chat room.</p>
+ 		</div>
+        <!-- The email input area-->
+ 		<center>
+    			<div class="">
+    				@content
+    			</div>
+    		</center>
+	</div>
+	
+
+	<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+	<script src="@routes.Assets.at("bootstrap/js/bootstrap.js")"></script>
+
+	<script type="text/javascript">
+
+            // Global variable
+            var numOfChatPeople = 0;
+            var userEmailList = new Array();
+
+			$("#addBtn").click(function(){
+				var newEmail=$("#chatItem").val();
+                if(newEmail != ''){
+                    
+                    // Increase the number of potential chat buddy by 1.
+                    numOfChatPeople = numOfChatPeople + 1;
+                    // Prepend a li element in the ul parent container.
+				    $("#chatList").prepend("<li id='li" + numOfChatPeople + "' class='list-group-item'>" + newEmail + "</li>");
+                    // Attach click event handler for each dynamic li element.
+                    $("#li" + numOfChatPeople).on("click", function(){
+                        $(this).remove();
+                        numOfChatPeople --;
+
+                        var tmpIndex = userEmailList.indexOf($(this).text());
+                        if(tmpIndex > -1){
+                            userEmailList.splice(tmpIndex, 1);
+                        }
+
+                        if(numOfChatPeople == 0){
+                            $("#confirmBtn").hide();
+                        }
+                    });
+
+                    if(numOfChatPeople > 0)
+                        $("#confirmBtn:hidden").show();
+
+                    userEmailList.splice(0, 0, newEmail);
+
+                    $("#chatItem").val('');
+                    $("#chatItem").focus();
+                }else{
+                    alert("Please type in a valid email.");
+                    $("#chatItem").focus();
+                }
+                // Prevent page from refreshing which results in DOM to re-construct(dynamic addition would be lost)
+                return false;
+			});	
+            
+            $("#confirmBtn").click(function(){
+                $("#chatTextList").val(userEmailList);
+            });
+	</script>
+</body>
+</html>

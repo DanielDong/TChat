@@ -1,0 +1,19 @@
+
+@import helper._
+
+@main(title = "TChat") {
+    
+	<form action="@routes.Application.startChat" id="userEmailForm" class="navbar-form"  method="POST">
+		
+		<input type="text" id="chatItem" name="chatItem" value="" size="40" style="height:32px;" placeholder="Email address" autofocus="autofocus" class="input-append">
+		
+		<button id="addBtn" class="btn btn-middle btn-success">Add</button>
+    	<div id="chatGroup" style="width: 350px;">
+    	<ul id="chatList" class="list-group">
+
+    	</ul>
+    	<button id="confirmBtn" type="submit" class="btn-success btn btn-middle" style="float:right;display:none;">Create Chat Room</button>
+    	</div>
+    	<input type="text" id="chatTextList" name="chatTextList" style="visibility:hidden"></input>
+	</form>
+}
