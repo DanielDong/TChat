@@ -1,0 +1,79 @@
+@(roomName: String, userName: String, roomId: String)
+@import helper._
+@main(title = roomName, username = userName){
+	<div id="onChatMember" class="container" style="margin-bottom:30px;">
+		<div class="row">
+			<div id="onChat" class="col-md-8">
+				<h2>Messages:</h2>
+				<div id="messages" >
+
+				</div>
+				<textarea id="chatInfo">
+
+				</textarea>
+			</div>
+			<div id="onMemeber" class="col-md-4">
+				<h2>Members:</h2>
+				<ul id="memberList">
+
+				</ul>
+			</div>
+		</div>
+	</div>
+	
+	
+	@if(flash.containsKey("buddyList")){
+		<input type="text" id="buddyList" name="buddyList" style="display:none" value="@flash.get("buddyList")">
+	}else{
+		<input type="text" id="buddyList" name="buddyList" style="display:none" value="none">
+	}
+
+	<script type="text/javascript">
+		$(function(){
+			var WS = window['MozWebSocket']? MozWebSocket: WebSocket;
+			var chatSocket = new WS("@routes.Application.chat(userName, roomId).webSocketURL(request)");
+			var sendMessage = function(){
+				chatSocket.send(JSON.stringify(
+					{text: $("#chatInfo").val()}
+				));
+				$("#chatInfo").val('');
+
+			};
+
+			var receiveEvent = function(event){
+				var data = JSON.parse(event.data);
+				if(data.error){
+					alert(data.error);
+					chatSocket.close();
+				}else{
+					$("#onChatMember").show();
+				}
+				
+				// Create chat element
+				var chatEl = $('<div class="message"><span></span><p></p></div>');
+				$("span", chatEl).text(data.username);
+				$("p", chatEl).text(data.text);
+				$(chatEl).addClass(data.kind);
+				if(data.user == "@userName")
+					$(chatEl).addClass("me");
+				$("#messages").append(chatEl);
+
+				// Update member list
+				$("#memberList").html('');
+				$(data.members).each(function(){
+					$("#memberList").append("<li>" + this + "</li>");
+				});
+			};
+
+			var handleReturnKey = function(e){
+				if(e.charCode == 13 || e.keyCode == 13){
+					e.preventDefault();
+					sendMessage();
+				}
+			};
+			$("#chatInfo").keypress(handleReturnKey);
+			chatSocket.onmessage = receiveEvent;
+		});
+	</script>
+	
+}

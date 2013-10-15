@@ -8,15 +8,20 @@
 	<link rel="stylesheet" type="text/css" href="@routes.Assets.at("bootstrap/css/bootstrap.css")">
     <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
     <script src="@routes.Assets.at("bootstrap/js/bootstrap.js")"></script>
+    <style type="text/css">
+        body{
+            padding-top: 70px;
+        }
+    </style>
 </head>
 
 <body>
 	
 
-	<div class="container">
-		<!-- The navigation bar-->
-		<div class="navbar navbar-default navbar-fixed-top">
-            <div class="container">
+	
+	<!-- The navigation bar-->
+	<div class="navbar navbar-default navbar-fixed-top">
+        <div class="container">
 
             <div class="navbar-header">
                 <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
@@ -35,8 +40,10 @@
                     <li><a href="#">Contact</a></li>
                   </ul>
             </div>
-            </div>
         </div>
+    </div>
+
+    <div class="container">
         @content    	
 	</div>
 
