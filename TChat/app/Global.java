@@ -1,5 +1,7 @@
 import java.lang.reflect.Method;
 
+import controllers.ChatRoomManager;
+
 import play.Application;
 import play.GlobalSettings;
 import play.Logger;
@@ -11,6 +13,8 @@ public class Global extends GlobalSettings{
 
 	@Override
 	public void onStart(Application app){
+		// Start the periodic probing process when the application starts.
+		ChatRoomManager.init();
 		Logger.info("Application has started ..........");
 	}
 	
@@ -21,8 +25,8 @@ public class Global extends GlobalSettings{
 	
 	@Override
 	public Action onRequest(Request request, Method actionMethod){
-		Logger.info("Request: " + request.toString() + " Remote IP: " + request.remoteAddress() + 
-				" HTTP method: " + request.method() + " Request URI: " + request.uri());
+		Logger.info("Request: [" + request.toString() + "] Remote IP: [" + request.remoteAddress() + 
+				"] HTTP method: [" + request.method() + "] Request URI: [" + request.uri() + "]");
 		return super.onRequest(request, actionMethod);
 	}
 }

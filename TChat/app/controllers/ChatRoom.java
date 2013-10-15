@@ -63,6 +63,7 @@ public class ChatRoom{
 			}
 		}));
 		
+		
 	}
 	
 	
@@ -107,7 +108,11 @@ public class ChatRoom{
 		@SuppressWarnings("deprecation")
 		@Override
 		public void onReceive(Object msg) throws Exception {
+			boolean isSendHeartBeat = false;
+			// A person tries to join this chat room.
 			if(msg instanceof Join){
+				isSendHeartBeat = true;
+				
 				Join message = (Join) msg;
 				String username = message.getUsername();
 				// Insertion point of this username in the membersList list.
@@ -131,22 +136,42 @@ public class ChatRoom{
 					}
 				}
 				
-			}else if(msg instanceof Talk){
+			}
+			// A chat member send a message in the chat room.
+			else if(msg instanceof Talk){
+				isSendHeartBeat = true;
+					
 				Talk message = (Talk) msg;
 				notifyAll("Talk", message.getUserName(), message.getMsg());
-			}else if(msg instanceof Quit){
+			}
+			// A member has quit from this chat room.
+			else if(msg instanceof Quit){
+				isSendHeartBeat = true;
+				
 				Quit message = (Quit) msg;
 				members.remove(message.getUsername());
 				notifyAll("Quit", message.getUsername(), " has left this room.");
+			}
+			// Close a chat room which is idle longer than ChatRoomManager.IDLE_MAX milliseconds.
+			else if(msg instanceof CloseRoom){
+				CloseRoom message = (CloseRoom) msg;
+				ActorRef closeRoomActorRef = message.getChatRoomActorRef();
+				for(String username: members.keySet()){
+					closeRoomActorRef.tell(new Quit(username));
+				}
 			}else{
 				unhandled(msg);
 			}
+			// Send heart beat message to ChatRoomManager.
+			if(isSendHeartBeat == true){
+				ChatRoomManager.sendHeartBeat(new HeartBeat(chatRoomId, chatRoomActorRef), chatRoomActorRef);
+			}
 		}
 		/**
-		 * 
-		 * @param kind Indicate the type of message(Join, Talk)
-		 * @param username
-		 * @param msg
+		 * Broadcast message to all alive chat members.
+		 * @param kind Indicate the type of message(Join, Talk, Quit)
+		 * @param username A chat member's email address.
+		 * @param msg Message to be sent to all alive chat members.
 		 */
 		public void notifyAll(String kind, String username, String msg){
 			for(WebSocket.Out<JsonNode> out: members.values()){
@@ -231,6 +256,10 @@ public class ChatRoom{
 		public ActorRef getChatRoomActorRef(){return chatRoomActorRef;}
 	}
 	
-	public static class CloseRoom{}
+	public static class CloseRoom{
+		private ActorRef chatRoomActorRef;
+		public CloseRoom(ActorRef roomActorRef){chatRoomActorRef = roomActorRef;}
+		public ActorRef getChatRoomActorRef(){return chatRoomActorRef;}
+	}
 	
 }

@@ -1,16 +1,21 @@
 package controllers;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import play.libs.Akka;
+import scala.concurrent.duration.Duration;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.actor.UntypedActor;
 import controllers.ChatRoom.ChatRoomActor;
-import controllers.ChatRoom.HeartBeat;
 import controllers.ChatRoom.CloseRoom;
+import controllers.ChatRoom.HeartBeat;
 
 /**
  * This ChatRoomManager Actor is created when the web site is started.
@@ -30,8 +35,29 @@ public class ChatRoomManager extends UntypedActor{
 	
 	private static ActorRef chatRoomManager = Akka.system().actorOf(new Props(ChatRoomManager.class), "ChatRoomManager");
 	
+	public static ActorRef getChatRoomManager(){return chatRoomManager;}
+	
 	private Map<Long, ChatRoomUnit> chatRooms = new HashMap<Long, ChatRoomUnit>();
 	
+	/**
+	 * Start the periodic probe message sending process.
+	 */
+	public static void init(){
+		// Send probe message to ChatRoomManager every 60 seconds.
+		Akka.system().scheduler().schedule(
+	            Duration.create(60, SECONDS),
+	            Duration.create(60, SECONDS),
+	            chatRoomManager,
+	            new Probe(),
+	            Akka.system().dispatcher()
+	        );
+	}
+	
+	/**
+	 * 
+	 * @param heartBeatMsg
+	 * @param chatRoomActorRef
+	 */
 	public static void sendHeartBeat(HeartBeat heartBeatMsg, ActorRef chatRoomActorRef){
 		chatRoomManager.tell(heartBeatMsg, chatRoomActorRef);
 	}
@@ -50,26 +76,46 @@ public class ChatRoomManager extends UntypedActor{
 			// An already alive chat room sends this heart beat message
 			else{
 				ChatRoomUnit roomUnit = chatRooms.get(roomId);
-				long lastTimeTag = roomUnit.getTimeTag();
-				long curTimeTag = System.currentTimeMillis();
-				// This chat room is not due.
-				if(curTimeTag - lastTimeTag < IDLE_MAX){
-					roomUnit.setTimeTag(System.currentTimeMillis());
-				}
-				// This chat room is due and should be closed.
-				else{
-					// Remove all the chat members from the chat room.
-					roomUnit.getChatRoomActorRef().tell(new CloseRoom());
-					// Stop due chat room's ActorRef
-					Akka.system().stop(roomUnit.getChatRoomActorRef());
-					// Remove chat room instance from the chat room list.
-					List<ChatRoom> chatRoomList = Application.getChatRooms();
-					for(ChatRoom room: chatRoomList){
-						if(room.getRoomId() == roomId){
-							chatRoomList.remove(room);
-							break;
-						}
-					}
+				updateEachChatRoom(roomId, roomUnit);
+			}
+		}else if(msg instanceof Probe){
+			Set<Long> roomIdSet = chatRooms.keySet();
+			Iterator<Long> iter = roomIdSet.iterator();
+			while(iter.hasNext()){
+				long roomId = iter.next();
+				ChatRoomUnit roomUnit = chatRooms.get(roomId);
+				updateEachChatRoom(roomId, roomUnit);
+			}
+			
+		}else{
+			unhandled(msg);
+		}
+	}
+	/**
+	 * This method either updates the chat room unit instance's time tag (if this chat room is not due) or
+	 * close the chat room (if this chat room is due).
+	 * @param roomId Chat room id.
+	 * @param roomUnit Chat room unit instance.
+	 */
+	private void updateEachChatRoom(long roomId, ChatRoomUnit roomUnit){
+		long lastTimeTag = roomUnit.getTimeTag();
+		long curTimeTag = System.currentTimeMillis();
+		// This chat room is not due.
+		if(curTimeTag - lastTimeTag < IDLE_MAX){
+			roomUnit.setTimeTag(System.currentTimeMillis());
+		}
+		// This chat room is due and should be closed.
+		else{
+			// Remove all the chat members from the chat room.
+			roomUnit.getChatRoomActorRef().tell(new CloseRoom(roomUnit.getChatRoomActorRef()));
+			// Stop due chat room's ActorRef
+			Akka.system().stop(roomUnit.getChatRoomActorRef());
+			// Remove chat room instance from the chat room list.
+			List<ChatRoom> chatRoomList = Application.getChatRooms();
+			for(ChatRoom room: chatRoomList){
+				if(room.getRoomId() == roomId){
+					chatRoomList.remove(room);
+					break;
 				}
 			}
 		}
@@ -90,5 +136,8 @@ public class ChatRoomManager extends UntypedActor{
 			timeTag = newTimetag;
 		}
 	}
+	
+	// -- messages
+	public static class Probe{}
 
 }
