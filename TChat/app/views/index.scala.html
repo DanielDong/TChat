@@ -1,19 +1,81 @@
 
 @import helper._
 
-@main(title = "TChat") {
-    
-	<form action="@routes.Application.startChat" id="userEmailForm" class="navbar-form"  method="POST">
-		
-		<input type="text" id="chatItem" name="chatItem" value="" size="40" style="height:32px;" placeholder="Email address" autofocus="autofocus" class="input-append">
-		
-		<button id="addBtn" class="btn btn-middle btn-success">Add</button>
-    	<div id="chatGroup" style="width: 350px;">
-    	<ul id="chatList" class="list-group">
+@main(title = "TChat", username = "") {
 
-    	</ul>
-    	<button id="confirmBtn" type="submit" class="btn-success btn btn-middle" style="float:right;display:none;">Create Chat Room</button>
-    	</div>
-    	<input type="text" id="chatTextList" name="chatTextList" style="visibility:hidden"></input>
-	</form>
+	<!-- The marketing area-->
+	<div class="jumbotron">
+    	<font size="20"><b>T-Chat</b></font> the easiest way of chat ever!
+    	<p>Simply add your friends' email addresses to the following box and create a tempoary chat room.</p>
+ 	</div>
+
+ 	<!-- The email input area-->
+	<center>
+		<div class="">
+			<form action="@routes.Application.startChat" id="userEmailForm" class="navbar-form"  method="POST">
+				<input type="text" id="chatRoomName" name="chatRoomName" size="20" style="height:32px;" placeholder="Chat Room Name" autofocus="autofocus" class="input-append">
+				<input type="text" id="userName" name="userName" size="20" style="height:32px;" placeholder="Your Name" class="input-append">
+				<input type="text" id="userItem" name="userItem" value="" size="35" style="height:32px;" placeholder="Your Email address" class="input-append">
+				<input type="text" id="chatItem" name="chatItem" value="" size="35" style="height:32px;" placeholder="Buddy Email address" class="input-append">
+				<button id="addBtn" class="btn btn-middle btn-success">Add</button>
+		    	<div id="chatGroup" style="width: 350px;">
+		    	<ul id="chatList" class="list-group">
+
+		    	</ul>
+		    	<button id="confirmBtn" type="submit" class="btn-success btn btn-middle" style="float:right;display:none;">Create Chat Room</button>
+		    	</div>
+		    	<input type="text" id="chatTextList" name="chatTextList" style="visibility:hidden"></input>
+			</form>
+		</div>
+	</center>
+
+	<script type="text/javascript">
+            
+            // Global variable
+            var numOfChatPeople = 0;
+            var userEmailList = new Array();
+
+			$("#addBtn").click(function(){
+				var newEmail=$("#chatItem").val();
+				
+                if(newEmail != ''){
+                    
+                    // Increase the number of potential chat buddy by 1.
+                    numOfChatPeople = numOfChatPeople + 1;
+                    // Prepend a li element in the ul parent.
+				    $("#chatList").prepend("<li id='li" + numOfChatPeople + "' class='list-group-item'>" + newEmail + "</li>");
+                    // Attach click event handler for each dynamic li element.
+                    $("#li" + numOfChatPeople).on("click", function(){
+                        $(this).remove();
+                        numOfChatPeople --;
+
+                        var tmpIndex = userEmailList.indexOf($(this).text());
+                        if(tmpIndex > -1){
+                            userEmailList.splice(tmpIndex, 1);
+                        }
+
+                        if(numOfChatPeople == 0){
+                            $("#confirmBtn").hide();
+                        }
+                    });
+
+                    if(numOfChatPeople > 0)
+                        $("#confirmBtn:hidden").show();
+
+                    userEmailList.splice(0, 0, newEmail);
+
+                    $("#chatItem").val('');
+                    $("#chatItem").focus();
+                }else{
+                    alert("Please type in a valid email.");
+                    $("#chatItem").focus();
+                }
+                // Prevent page from refreshing which results in DOM to re-construct(dynamic addition would be lost)
+                return false;
+			});	
+            
+            $("#confirmBtn").click(function(){
+                $("#chatTextList").val(userEmailList);
+            });
+	</script>
 }
