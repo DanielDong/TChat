@@ -1,4 +1,4 @@
-package controllers;
+package models;
 
 import static akka.pattern.Patterns.ask;
 import static java.util.concurrent.TimeUnit.SECONDS;

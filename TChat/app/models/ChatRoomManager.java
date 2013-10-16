@@ -1,4 +1,4 @@
-package controllers;
+package models;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -8,15 +8,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import models.ChatRoom.ChatRoomActor;
+import models.ChatRoom.CloseRoom;
+import models.ChatRoom.HeartBeat;
 import play.libs.Akka;
 import scala.concurrent.duration.Duration;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.actor.UntypedActor;
-import controllers.ChatRoom.ChatRoomActor;
-import controllers.ChatRoom.CloseRoom;
-import controllers.ChatRoom.HeartBeat;
-
+import controllers.Application;
 /**
  * This ChatRoomManager Actor is created when the web site is started.
  * Only one such Actor instance exists during the whole web site life cycle.

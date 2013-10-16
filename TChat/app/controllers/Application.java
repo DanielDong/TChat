@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+import models.ChatRoom;
+
 import org.codehaus.jackson.JsonNode;
 
 import play.Logger;
@@ -16,6 +18,7 @@ import play.libs.Akka;
 import play.mvc.Controller;
 import play.mvc.Result;
 import play.mvc.WebSocket;
+import utils.MailUtil;
 import views.html.chatRoom;
 import views.html.index;
 import akka.actor.ActorRef;
@@ -45,7 +48,8 @@ public class Application extends Controller {
      * @return
      */
     public static Result admin(){
-    	return ok("To be done.");
+    	
+    	return TODO;
     }
 
     /**

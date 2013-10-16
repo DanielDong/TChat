@@ -1,6 +1,7 @@
 import java.lang.reflect.Method;
 
-import controllers.ChatRoomManager;
+import models.ChatRoomManager;
+
 
 import play.Application;
 import play.GlobalSettings;
