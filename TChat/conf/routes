@@ -15,7 +15,7 @@ GET      /joinchat				    controllers.Application.joinChat(username: String ?= n
 GET 	 /chat						controllers.Application.chat(username: String ?= null, roomId: String ?= null)
 
 # Admin page for this chat application
-GET      /admin				        controllers.Application.admin()
+GET      /admin				        controllers.Admin.index(id: Int ?= 0)
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

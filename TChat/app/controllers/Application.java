@@ -97,6 +97,7 @@ public class Application extends Controller {
 			
 			// Add newly created chat room to chat room list
 			chatRooms.add(newChatRoom);
+			LOG.info("new room added!!!!!!" + chatRooms.get(0).getRoomName());
 			
 			String subject = "[TChat]" + chatRoomName + " invites you to join their conversation.";
 			String body = "Click on the following link to join the room. http://localhost:9000/joinchat?roomId=" + newRoomId + "&username=";

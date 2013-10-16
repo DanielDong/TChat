@@ -132,7 +132,7 @@ public class ChatRoom{
 					else{
 						getSender().tell("OK");
 						members.put(username, message.out);
-						notifyAll("Join", message.getUsername(), " has joined this room.");
+						notifyAll("join", message.getUsername(), " has joined this room.");
 					}
 				}
 				
@@ -142,7 +142,7 @@ public class ChatRoom{
 				isSendHeartBeat = true;
 					
 				Talk message = (Talk) msg;
-				notifyAll("Talk", message.getUserName(), message.getMsg());
+				notifyAll("talk", message.getUserName(), message.getMsg());
 			}
 			// A member has quit from this chat room.
 			else if(msg instanceof Quit){
@@ -150,7 +150,7 @@ public class ChatRoom{
 				
 				Quit message = (Quit) msg;
 				members.remove(message.getUsername());
-				notifyAll("Quit", message.getUsername(), " has left this room.");
+				notifyAll("quit", message.getUsername(), " has left this room.");
 			}
 			// Close a chat room which is idle longer than ChatRoomManager.IDLE_MAX milliseconds.
 			else if(msg instanceof CloseRoom){

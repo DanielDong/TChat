@@ -1,16 +1,38 @@
 @(roomName: String, userName: String, roomId: String)
 @import helper._
 @main(title = roomName, username = userName){
+	<style type="text/css">
+		.base-message{
+			padding: 5px;
+		    margin-bottom: 10px;
+		    border: 1px solid transparent;
+		    border-radius: 4px;
+		}
+		.talk{
+			 color: #468847;
+			 background-color: #dff0d8;
+			 border-color: #d6e9c6;
+		}
+		.join{
+			color: #3a87ad;
+  			background-color: #d9edf7;
+  			border-color: #bce8f1;
+		}
+		.quit{
+			color:#b94a48;
+			background-color:#f2dede;
+			border-color:#eed3d7;
+		}
+		
+	</style>
 	<div id="onChatMember" class="container" style="margin-bottom:30px;">
 		<div class="row">
 			<div id="onChat" class="col-md-8">
 				<h2>Messages:</h2>
-				<div id="messages" >
+				<div id="messages" style="height:500px; overflow:auto;">
 
 				</div>
-				<textarea id="chatInfo">
-
-				</textarea>
+				<textarea id="chatInfo" style="width: 100%;margin-top:20px;" placeholder="Enter your text here. Hit enter key to send."></textarea>
 			</div>
 			<div id="onMemeber" class="col-md-4">
 				<h2>Members:</h2>
@@ -50,19 +72,29 @@
 				}
 				
 				// Create chat element
-				var chatEl = $('<div class="message"><span></span><p></p></div>');
-				$("span", chatEl).text(data.username);
-				$("p", chatEl).text(data.text);
+				var chatEl = $('<div class="base-message" style="display:inline-block;"><span>' + data.username + '</span><p>' + data.text + '</p></div>');
+				//$("span", chatEl).text(data.username);
+				//$("p", chatEl).text(data.text);
 				$(chatEl).addClass(data.kind);
-				if(data.user == "@userName")
-					$(chatEl).addClass("me");
-				$("#messages").append(chatEl);
+				
+				
+				var outter = $('<div></div>');
+				outter.append(chatEl);
+				
+				$("#messages").append(outter);
+				if(chatEl.outerWidth() >= $("#messages").width())
+					chatEl.css("width", ($("#messages").width() - 20));
+				else
+					if(data.username == "@userName")
+						chatEl.css("position", "relative").css("left",($("#messages").width() - chatEl.outerWidth() - 20));
+				
 
 				// Update member list
 				$("#memberList").html('');
 				$(data.members).each(function(){
 					$("#memberList").append("<li>" + this + "</li>");
 				});
+				$("#messages").scrollTop($("#messages").prop("scrollHeight"));
 			};
 
 			var handleReturnKey = function(e){
@@ -73,6 +105,9 @@
 			};
 			$("#chatInfo").keypress(handleReturnKey);
 			chatSocket.onmessage = receiveEvent;
+			$(window).bind("beforeunload", function(){
+				return "";
+			});
 		});
 	</script>
 	

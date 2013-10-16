@@ -1,0 +1,27 @@
+@(roomList: List[ChatRoom])
+@import helper._
+@main(title = "Chat Room Admin", username = "Admin"){
+	
+		
+			@if(roomList.isEmpty() == true){
+				<div class="alert alert-danger">Opps. There are no alive chat rooms now.</div>
+			}else{
+				<table class="zebra-striped" >
+					<thead class="header">
+						<th>Room Id</th>
+						<th>Room Name</th>
+						<th>Room Member Group</th>
+					</thead>
+					<tbody>
+						@for(room <- roomList){
+							<tr>
+								<td>@room.getRoomId()</td>
+								<td>@room.getRoomName()</td>
+								<td><a href="#">Check room member list</a></td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			}
+		
+}
