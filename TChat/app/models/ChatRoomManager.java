@@ -11,6 +11,7 @@ import java.util.Set;
 import models.ChatRoom.ChatRoomActor;
 import models.ChatRoom.CloseRoom;
 import models.ChatRoom.HeartBeat;
+import play.Logger;
 import play.libs.Akka;
 import scala.concurrent.duration.Duration;
 import akka.actor.ActorRef;
@@ -78,6 +79,7 @@ public class ChatRoomManager extends UntypedActor{
 				ChatRoomUnit roomUnit = chatRooms.get(roomId);
 				updateEachChatRoom(roomId, roomUnit);
 			}
+			Logger.of(ChatRoomManager.class).info("Chat Room Manager - HeartBeat message received: " + message.getRoomId());
 		}else if(msg instanceof Probe){
 			Set<Long> roomIdSet = chatRooms.keySet();
 			Iterator<Long> iter = roomIdSet.iterator();
@@ -118,6 +120,7 @@ public class ChatRoomManager extends UntypedActor{
 					break;
 				}
 			}
+			Logger.of(ChatRoomManager.class).info("Chat Room Manager Closes chat rooms: " + roomId);
 		}
 	}
 	

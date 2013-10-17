@@ -2,7 +2,10 @@
 @import helper._
 @main(title = "Chat Room Admin", username = "Admin"){
 	
-		
+			<style type="text/css">
+				.zebra-striped tbody tr:nth-child(odd) td{background-color:#f9f9f9;}
+				.zebra-striped tbody tr:hover td{background-color:#f5f5f5;}
+			</style>	
 			@if(roomList.isEmpty() == true){
 				<div class="alert alert-danger">Opps. There are no alive chat rooms now.</div>
 			}else{
