@@ -4,13 +4,13 @@ import static akka.pattern.Patterns.ask;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.codehaus.jackson.JsonNode;
@@ -26,6 +26,7 @@ import play.libs.Json;
 import play.mvc.WebSocket;
 import scala.concurrent.Await;
 import scala.concurrent.duration.Duration;
+import utils.SearchUtil;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.actor.UntypedActor;
@@ -56,6 +57,7 @@ public class ChatRoom{
 		chatRoomName = roomName;
 		chatRoomId = roomId;
 		membersList = memberList;
+		Arrays.sort(membersList);
 		chatHistory = new ConcurrentLinkedQueue<ChatRecord>();
 		
 		for(int i = 0; i < memberList.length; i ++){
@@ -71,8 +73,6 @@ public class ChatRoom{
 			    return new ChatRoomActor();
 			}
 		}));
-		
-		
 	}
 	
 	
@@ -101,6 +101,9 @@ public class ChatRoom{
 						// view history command is received.
 						chatRoomActorRef.tell(new History(username), chatRoomActorRef);
 						
+					}else if(kind.equals("searchchathistory")){
+						String searchTxt = event.get("text").asText().trim();
+						chatRoomActorRef.tell(new SearchHistory(username, searchTxt), chatRoomActorRef);
 					}
 				}
 			});
@@ -228,6 +231,23 @@ public class ChatRoom{
 					Logger.of(ChatRoomActor.class).info(message.getUsername() +  "'s channel socket is lost.");
 				}
 				
+			}
+			// Process a chat member's search chat history request.
+			else if(msg instanceof SearchHistory){
+				SearchHistory message = (SearchHistory) msg;
+				ArrayList<String> retList = SearchUtil.searchChatHistory(getChatHistoryStr(), message.getSearchTxt());
+				String historyMsg = retList.get(0);
+				String numOfMatches = retList.get(1);
+				
+				WebSocket.Out<JsonNode> channel = members.get(message.getUsername());
+				if(channel != null){
+					ObjectNode event = Json.newObject();
+					event.put("key", "searchhistory");
+					event.put("text", historyMsg);
+					event.put("numofmatch", numOfMatches);
+					channel.write(event);
+				}
+				
 			}else{
 				unhandled(msg);
 			}
@@ -353,6 +373,27 @@ public class ChatRoom{
 //		public WebSocket.Out<JsonNode> getOutChannel(){return out;}
 		public String getUsername(){return username;}
 		
+	}
+	/**
+	 * A chat member sends a <i>SearchHistory</i> message to search through 
+	 * the chat room's chat history with search text specified.
+	 * @author shichaodong
+	 * @version 1.0
+	 */
+	public static class SearchHistory{
+		private String username;
+		private String searchTxt;
+		public SearchHistory(String name, String txt){
+			username = name;
+			searchTxt = txt;
+		}
+		public String getUsername(){
+			return username;
+		}
+		
+		public String getSearchTxt(){
+			return searchTxt;
+		}
 	}
 	/**
 	 * One <i>ChatRecord</i> instance records one chat member's chat record 

@@ -54,11 +54,20 @@
 		$(function(){
 			var WS = window['MozWebSocket']? MozWebSocket: WebSocket;
 			var chatSocket = new WS("@routes.Application.chat(userName, roomId).webSocketURL(request)");
-			var sendMessage = function(){
-				chatSocket.send(JSON.stringify(
-					{text: $("#chatInfo").val()}
-				));
-				$("#chatInfo").val('');
+			
+			var sendMessage = function(type){
+				if(type == "text"){
+					chatSocket.send(JSON.stringify(
+						{kind: "text",
+						text: $("#chatInfo").val()}
+					));
+					$("#chatInfo").val('');
+				}else if(type == "viewhistory"){
+					chatSocket.send(JSON.stringify(
+						{kind: "viewhistory",
+						text: ""}
+					));
+				}
 
 			};
 
@@ -70,45 +79,69 @@
 				}else{
 					$("#onChatMember").show();
 				}
-				
-				// Create chat element
-				var chatEl = $('<div class="base-message" style="display:inline-block;"><span>' + data.username + '</span><p>' + data.text + '</p></div>');
-				//$("span", chatEl).text(data.username);
-				//$("p", chatEl).text(data.text);
-				$(chatEl).addClass(data.kind);
-				
-				
-				var outter = $('<div></div>');
-				outter.append(chatEl);
-				
-				$("#messages").append(outter);
-				if(chatEl.outerWidth() >= $("#messages").width())
-					chatEl.css("width", ($("#messages").width() - 20));
-				else
-					if(data.username == "@userName")
-						chatEl.css("position", "relative").css("left",($("#messages").width() - chatEl.outerWidth() - 20));
-				
 
-				// Update member list
-				$("#memberList").html('');
-				$(data.members).each(function(){
-					$("#memberList").append("<li>" + this + "</li>");
-				});
-				$("#messages").scrollTop($("#messages").prop("scrollHeight"));
+				if(data.key == "history"){
+					$("#outter:hidden").show();
+					var historyData = data.text;
+					$("#historyBody").html(historyData);
+
+				}else if(data.key == "text"){
+					// Create chat element
+					var chatEl = $('<div class="base-message" style="display:inline-block;"><span>' + data.username + '</span><p>' + data.text + '</p></div>');
+					//$("span", chatEl).text(data.username);
+					//$("p", chatEl).text(data.text);
+					$(chatEl).addClass(data.kind);
+					
+					
+					var outter = $('<div></div>');
+					outter.append(chatEl);
+					
+					$("#messages").append(outter);
+					// 10 is for padding
+					if(chatEl.outerWidth() + 10 >= $("#messages").width())
+						chatEl.css("width", ($("#messages").width()));
+					else
+						if(data.username == "@userName")
+							chatEl.css("position", "relative").css("left",($("#messages").width() - chatEl.outerWidth()));
+					
+
+					// Update member list
+					$("#memberList").html('');
+					$(data.members).each(function(){
+						$("#memberList").append("<li>" + this + "</li>");
+					});
+					$("#messages").scrollTop($("#messages").prop("scrollHeight"));
+				}
+				
+				
 			};
 
 			var handleReturnKey = function(e){
 				if(e.charCode == 13 || e.keyCode == 13){
 					e.preventDefault();
-					sendMessage();
+					sendMessage("text");
 				}
 			};
+
+			$("#viewA").click(function(){
+		        sendMessage("viewhistory");
+		        //$("#outter:hidden").show();
+		    });
+
+		    $("#clsA").click(function(){
+		        $("#outter").hide();
+		    });
+
+		    $("#searBtn").click(function(){
+		        alert("search button clicked.!");
+		    });
 			$("#chatInfo").keypress(handleReturnKey);
 			chatSocket.onmessage = receiveEvent;
 			$(window).bind("beforeunload", function(){
-				return "";
+				return "TChat is interesting!";
 			});
 		});
+
+
 	</script>
-	
-}
+}{@views.html.chatRoomNavbar()}

@@ -37,7 +37,7 @@ public class ChatRoomManager extends UntypedActor{
 	private static ActorRef chatRoomManager = Akka.system().actorOf(new Props(ChatRoomManager.class), "ChatRoomManager");
 	
 	public static ActorRef getChatRoomManager(){return chatRoomManager;}
-	
+	// key is room id, value is ChatRoomUnit instance
 	private Map<Long, ChatRoomUnit> chatRooms = new HashMap<Long, ChatRoomUnit>();
 	
 	/**
@@ -105,6 +105,7 @@ public class ChatRoomManager extends UntypedActor{
 		// This chat room is not due.
 		if(curTimeTag - lastTimeTag < IDLE_MAX){
 			roomUnit.setTimeTag(System.currentTimeMillis());
+			Logger.of(ChatRoomManager.class).info("Chat Room Manager - chat room(" + roomId + ") TIME updated.");
 		}
 		// This chat room is due and should be closed.
 		else{
@@ -117,10 +118,12 @@ public class ChatRoomManager extends UntypedActor{
 			for(ChatRoom room: chatRoomList){
 				if(room.getRoomId() == roomId){
 					chatRoomList.remove(room);
+					chatRooms.remove(roomId);
+					Logger.of(ChatRoomManager.class).info("Chat Room Manager CLOSEes chat rooms: " + roomId);
 					break;
 				}
 			}
-			Logger.of(ChatRoomManager.class).info("Chat Room Manager Closes chat rooms: " + roomId);
+			Logger.of(ChatRoomManager.class).info("Chat Room Manager TRIES TO CLOSE chat rooms: " + roomId);
 		}
 	}
 	

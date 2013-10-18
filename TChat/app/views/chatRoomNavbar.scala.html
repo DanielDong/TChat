@@ -1,0 +1,54 @@
+<!-- The navigation bar-->
+<div class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#">T-Chat</a>
+        </div>
+
+        <div class="navbar-collapse collapse">
+            <ul class="nav navbar-nav">
+                <li class="active"><a href="#">Home</a></li>
+                <li><a id="viewA" href="#">View Chat History</a></li>
+                <li><a href="#">Save Chat</a></li>
+                <li><a href="#">Download Chat</a></li>
+                <li><a href="#">Contact</a></li>
+              </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Chat history-->
+<div id="outter" style="background-color: rgba(226, 220, 232, 0.6); display:none; position: absolute; top:0px; width:100%; height:100%; z-index: 1000">
+    <div id="inner" class="container" style="height:700px; width:800px; background-color:yellow; margin-top: 70px; border-radius: 3px; z-index: 1000">
+        <!-- search box, search button, close button-->
+        <div style="margin-top:20px;margin-bottom:20px;">
+            <div class="input-group">
+                <input id="searTxt" type="text" class="form-control" placeholder="Search text">
+                <div class="input-group-btn">
+                    <button id="searBtn" type="button" class="btn btn-default">Search</button>
+                    <button id="clsBtn" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></button>
+                    <ul class="dropdown-menu pull-right">
+                        <li><a id="clsA" href="#">Close</a></li>
+                    </ul>
+                </div>
+            </div><!-- /.input-group -->
+        </div>
+
+        <!-- chat history-->
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 id="historyTitle" class="panel-title">Chat history</h3>
+            </div>
+            <div id="historyBody" class="panel-body" style="overflow:auto; height: 580px;"></div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript">
+    
+</script>

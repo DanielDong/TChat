@@ -58,14 +58,25 @@
 			var sendMessage = function(type){
 				if(type == "text"){
 					chatSocket.send(JSON.stringify(
-						{kind: "text",
-						text: $("#chatInfo").val()}
+						{
+							kind: "text",
+							text: $("#chatInfo").val()
+						}
 					));
 					$("#chatInfo").val('');
 				}else if(type == "viewhistory"){
 					chatSocket.send(JSON.stringify(
-						{kind: "viewhistory",
-						text: ""}
+						{
+							kind: "viewhistory",
+							text: ""
+						}
+					));
+				}else if(type == "searchchathistory"){
+					chatSocket.send(JSON.stringify(
+						{
+							kind: "searchchathistory",
+							text: $("#searTxt").val()
+						}
 					));
 				}
 
@@ -84,6 +95,12 @@
 					$("#outter:hidden").show();
 					var historyData = data.text;
 					$("#historyBody").html(historyData);
+
+				}else if(data.key == "searchhistory"){
+					var newHistoryData = data.text;
+					var numOfMatches = data.numofmatch;
+					$("#historyBody").html(newHistoryData);
+
 
 				}else if(data.key == "text"){
 					// Create chat element
@@ -133,7 +150,8 @@
 		    });
 
 		    $("#searBtn").click(function(){
-		        alert("search button clicked.!");
+		        //alert("search button clicked.!");
+		        sendMessage("searchchathistory");
 		    });
 			$("#chatInfo").keypress(handleReturnKey);
 			chatSocket.onmessage = receiveEvent;

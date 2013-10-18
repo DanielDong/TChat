@@ -1,0 +1,70 @@
+<!-- The navigation bar-->
+<div class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#">T-Chat</a>
+        </div>
+
+        <div class="navbar-collapse collapse">
+            <ul class="nav navbar-nav">
+                <li class="active"><a id="homeA" href="#">Home</a></li>
+                <li><a href="#">Item1</a></li>
+                <li><a href="#">About</a></li>
+                <li><a href="#">Contact</a></li>
+              </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Chat history-->
+<div id="outter" style="background-color: rgba(226, 220, 232, 0.6); display:none; position: absolute; top:0px; width:100%; height:100%;">
+    <div id="inner" class="container" style="height:700px; width:800px; background-color:yellow; overflow:auto; margin-top: 70px; border-radius: 3px;">
+
+        <div style="margin-top:20px;margin-bottom:20px;">
+            <div class="input-group">
+                <input id="searTxt" type="text" class="form-control" placeholder="Search text">
+                <div class="input-group-btn">
+                    <button id="searBtn" type="button" class="btn btn-default">Search</button>
+                    <button id="clsBtn" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></button>
+                    <ul class="dropdown-menu pull-right">
+                        <li><a id="clsA" href="#">Close</a></li>
+                    </ul>
+                </div>
+            </div><!-- /.input-group -->
+        </div>
+
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 id="historyTitle" class="panel-title">Chat history</h3>
+            </div>
+            <div id="historyBody" class="panel-body">
+                We encourage peer to peer critique.  Challenging the poet not to only write poetry, but to offer suggestions to other poets to help them improve as well. We expect poets to have a thick skin and not to take it personal if they are unhappy with a critque from another member. The goal is to get honest feedback from other poets to help each member improve as a writer. At the same time we encourage poets to critique the poem and not criticize the poet personally. Poets here are from all over the world with many different backgrounds, We encourage poets to keep an open mind when reading poetry from members that do not share the same values or cultural background.
+            </div>
+        </div>
+
+    </div>
+</div>
+<script type="text/javascript">
+    $("#homeA").click(function(){
+        $("#outter:hidden").show();
+    });
+
+    $("#clsA").click(function(){
+        $("#outter").hide();
+        //show();
+    });
+
+    $("#searBtn").click(function(){
+        alert("search button clicked.!");
+    });
+</script>
+<script type="text/javascript">
+    var show = function(){alert("okay to call")};
+</script>
