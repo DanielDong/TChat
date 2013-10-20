@@ -42,15 +42,6 @@ public class Application extends Controller {
     public static Result index() {
         return ok(index.render());
     }
-    
-    /**
-     * Admin page for this chat application.
-     * @return
-     */
-    public static Result admin(){
-    	
-    	return TODO;
-    }
 
     /**
      * Process request for starting a new chat room.

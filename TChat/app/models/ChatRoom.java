@@ -3,6 +3,13 @@ package models;
 import static akka.pattern.Patterns.ask;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,6 +24,8 @@ import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.node.ArrayNode;
 import org.codehaus.jackson.node.ObjectNode;
 
+import controllers.Application;
+
 import play.Logger;
 import play.Logger.ALogger;
 import play.libs.Akka;
@@ -27,13 +36,19 @@ import play.mvc.WebSocket;
 import scala.concurrent.Await;
 import scala.concurrent.duration.Duration;
 import utils.SearchUtil;
+import akka.actor.Actor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.actor.UntypedActor;
 import akka.actor.UntypedActorFactory;
 
-public class ChatRoom{
+public class ChatRoom implements Serializable{
 	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 3310140045862782665L;
+
 	private static final ALogger LOG = Logger.of(ChatRoom.class);
 	
 	// The literal room name.
@@ -43,9 +58,15 @@ public class ChatRoom{
 	// The email addresses of room members. (People whose email address not present are not allowed to join room)
 	private String[] membersList;
 	// An ActorRef pointing to an Actor instance which coordinates the chat information.
-	private ActorRef chatRoomActorRef;
+	private transient ActorRef chatRoomActorRef;
 	// Recored chat history 
 	private Queue<ChatRecord> chatHistory;
+	// Indicate if chat room is saved or not(false for not saved, true for saved).
+	private boolean isSaved = false;
+	/* After a chat room is saved, this flag to indicate if updates have been made
+	 * since last save.(false for no update, true for new updates have been made)
+	 */
+	private boolean isUpdated = false;
 	
 	public long getRoomId(){return chatRoomId;}
 	public String getRoomName(){return chatRoomName;}
@@ -58,21 +79,13 @@ public class ChatRoom{
 		chatRoomId = roomId;
 		membersList = memberList;
 		Arrays.sort(membersList);
+		// The access to chat history is thread-safe.
 		chatHistory = new ConcurrentLinkedQueue<ChatRecord>();
 		
 		for(int i = 0; i < memberList.length; i ++){
 			LOG.info("Room member: " + memberList[i]);
 		}
-		chatRoomActorRef = Akka.system().actorOf(new Props().withCreator(new UntypedActorFactory(){
-			/**
-			 * 
-			 */
-			private static final long serialVersionUID = 1L;
-
-			public UntypedActor create() {
-			    return new ChatRoomActor();
-			}
-		}));
+		chatRoomActorRef = Akka.system().actorOf(new Props().withCreator(new UntypedActorCreator()));
 	}
 	
 	
@@ -95,15 +108,27 @@ public class ChatRoom{
 				@Override
 				public void invoke(JsonNode event) throws Throwable {
 					String kind = event.get("kind").asText();
+					// A chat member sends a text message which needs to be broadcast to all other members.
 					if(kind.equals("text"))
 						chatRoomActorRef.tell(new Talk(username, event.get("text").asText()), chatRoomActorRef);
+					// A chat member send a request for viewing the chat history.
 					else if(kind.equals("viewhistory")){
 						// view history command is received.
 						chatRoomActorRef.tell(new History(username), chatRoomActorRef);
 						
-					}else if(kind.equals("searchchathistory")){
+					}
+					// A chat member send a requst to search the chat history for certain text.
+					else if(kind.equals("searchchathistory")){
 						String searchTxt = event.get("text").asText().trim();
 						chatRoomActorRef.tell(new SearchHistory(username, searchTxt), chatRoomActorRef);
+					}
+					/* A chat member issue the chat save command.
+					 * A chat room would be saved when:
+					 * 	(1) updates(new messages have been sent by chat members) have been made.
+					 *  (2) this is the first time to be saved.
+					 */
+					else if(kind.equals("savechat")){
+						chatRoomActorRef.tell(new SaveChat(username, String.valueOf(chatRoomId)), chatRoomActorRef);
 					}
 				}
 			});
@@ -111,7 +136,7 @@ public class ChatRoom{
 			in.onClose(new Callback0(){
 				@Override
 				public void invoke() throws Throwable {
-					chatRoomActorRef.tell(new Quit(username), chatRoomActorRef);
+					chatRoomActorRef.tell(new Quit(username, String.valueOf(chatRoomId)), chatRoomActorRef);
 				}
 			});
 			return "You have successfully joined the chat room. Enjoy!";
@@ -140,6 +165,83 @@ public class ChatRoom{
 			sb.append("<span>" + cr.getUsername() + "		</span><span>" + cr.getTimeTag() + "</span><p>" + cr.getText() + "</p>");
 		}
 		return sb.toString();
+	}
+	
+
+	/**
+	 * Each chat room has its own folder to store everything.
+	 * Folder is named after chat room's room id.
+	 * @param roomId Chat room's id.
+	 * @return true to indicate this chat room has been saved before(a folder dedicated to this room has been already created); 
+	 * false to indicate this chat room is a fresh new one.
+	 */
+	private boolean hasSavedBefore(String roomId){
+		return new File(roomId).exists();
+	}
+	/**
+	 * Create a new chat room folder and store all related resources(image, uploaded files) to this folder.
+	 * <ul>Chat room folder structure: 
+	 * 	<li>[roomId]                     - chat room folder with chat room id as its name.</li>
+	 * 	<ul><li>	[file]                   - file folder to store all uploaded files.</li>
+	 * 	<li>	[img]                    - img folder to store all uploaded images.</li>
+	 * 	<li>	chatHistory.data         - a file to store persisted chat room(chat room name, chat member list and chat history).</li></ul>
+	 * </ul>
+	 * @param roomId
+	 * @return File object pointing to the chat_history file to extract chat room name, member list and chat history.
+	 * @throws IOException 
+	 */
+	private boolean persistChatRoom(String roomId) throws IOException{
+		String fileSeparator = System.getProperty("file.separator");
+		File f1 = new File(roomId + fileSeparator + fileSeparator + "file");
+		if(f1.mkdirs() == false){
+			Logger.of(ChatRoomActor.class).info("chat room folder: " + roomId + fileSeparator + fileSeparator + "file" + " FAILed to be created.");
+			return false;
+		}
+		
+		File f2 = new File(roomId + fileSeparator + fileSeparator + "img");
+		if(f2.mkdirs() == false){
+			Logger.of(ChatRoomActor.class).info("chat room folder: " + roomId + fileSeparator + fileSeparator + "img" + " FAILed to be created.");
+			return false;
+		}
+		
+		FileOutputStream fos = new FileOutputStream(roomId + fileSeparator + fileSeparator + "chatRoom.data");
+		ObjectOutputStream oos = new ObjectOutputStream(fos);
+		oos.writeObject(this);
+		oos.flush();
+		oos.close();
+		return true;
+		
+//		File f3 = new File(roomId + fileSeparator + fileSeparator + "chat_history.txt");
+//		if(f3.createNewFile()){
+//			return f3;
+//		}else{
+//			Logger.of(ChatRoomActor.class).info("chat room file: " + roomId + fileSeparator + fileSeparator + "chat_history.txt" + " FAILed to be created.");
+//			return null;
+//		}
+	}
+	
+	/**
+	 * Read in the persisted chat room from disk.
+	 * @param roomId Room id (also name for the chat room folder)
+	 * @return true to indicate successfully reading in persisted chat room; otherwise false.
+	 * @throws IOException 
+	 * @throws ClassNotFoundException 
+	 */
+	private ChatRoom readPersistedChatRoom(String roomId) throws IOException, ClassNotFoundException{
+		String fileSeparator = System.getProperty("file.separator");
+		File f = new File(roomId + fileSeparator + fileSeparator + "chatRoom.data");
+		// File exists and read in the persisted chat room.
+		if(f.exists()){
+			FileInputStream fis = new FileInputStream(f);
+			ObjectInputStream ois = new ObjectInputStream(fis);
+			ChatRoom chatRoom = (ChatRoom) ois.readObject();
+			chatRoom.setRoomActorRef(Akka.system().actorOf(new Props().withCreator(new UntypedActorCreator())));
+			return chatRoom;
+		}
+		// File does not exist.
+		else{
+			return null;
+		}
 	}
 	
 	public class ChatRoomActor extends UntypedActor{
@@ -183,7 +285,7 @@ public class ChatRoom{
 						addChatRecordToHistory(timeTagStr, username, "has joined this room.");
 					}
 				}
-				
+				isUpdated = true;
 			}
 			// A chat member send a message in the chat room.
 			else if(msg instanceof Talk){
@@ -195,6 +297,7 @@ public class ChatRoom{
 				notifyAll("talk", username, text);
 				// Add talk chat record to chat history.
 				addChatRecordToHistory(timeTagStr, username, text);
+				isUpdated = true;
 			}
 			// A member has quit from this chat room.
 			else if(msg instanceof Quit){
@@ -202,18 +305,34 @@ public class ChatRoom{
 				
 				Quit message = (Quit) msg;
 				String username = message.getUsername();
+				String roomId = message.getRoomId();
 				members.remove(username);
 				notifyAll("quit", username, " has left this room.");
 				// Add quit chat record to chat history.
 				addChatRecordToHistory(timeTagStr, username, "has left this room.");
+				isUpdated = true;
+				// All chat members have left the chat room.
+				if(members.size() == 0){
+					chatRoomActorRef.tell(new CloseRoom(roomId, chatRoomActorRef), chatRoomActorRef);
+				}
 			}
 			// Close a chat room which is idle longer than ChatRoomManager.IDLE_MAX milliseconds.
 			else if(msg instanceof CloseRoom){
 				CloseRoom message = (CloseRoom) msg;
+				String roomId = message.getRoomId();
 				ActorRef closeRoomActorRef = message.getChatRoomActorRef();
-				for(String username: members.keySet()){
-					closeRoomActorRef.tell(new Quit(username));
+				if(members.size() > 0){
+					for(String username: members.keySet()){
+						closeRoomActorRef.tell(new Quit(username, roomId));
+					}
 				}
+				
+				// Close the ActorRef of this chat room.
+				Akka.system().stop(message.getChatRoomActorRef());
+				// Persist this chat room.
+				persistChatRoom(roomId);
+				// Remove this chat room
+				Application.getChatRooms().remove(this);
 			}
 			// A chat member ask to see the chat history.
 			else if(msg instanceof History){
@@ -242,12 +361,58 @@ public class ChatRoom{
 				WebSocket.Out<JsonNode> channel = members.get(message.getUsername());
 				if(channel != null){
 					ObjectNode event = Json.newObject();
+					// key indicates the type of message.
 					event.put("key", "searchhistory");
+					// kind indicates the CSS class of message.
 					event.put("text", historyMsg);
 					event.put("numofmatch", numOfMatches);
 					channel.write(event);
 				}
-				
+			}else if(msg instanceof SaveChat){
+				SaveChat message = (SaveChat) msg;
+				String username = message.getUsername();
+				String roomId = message.getRoomId();
+				// This chat room history has been saved early in this chat session.
+				if(isSaved == true){
+					// New updates have been made since last save.
+					if(isUpdated == true){
+						persistChatRoom(roomId);
+						// Command: chatsaved to indicate chat room has been saved.
+						notifyCertainUser("chatsaved", "text", username, "Chat has been saved successuflly!");
+						
+					}
+					// NO updates made since last save.
+					else{
+						notifyCertainUser("chatsaved", "text", username, "NO updates made since last save.");
+					}
+				}
+				/* This is the first time to save this chat room history
+				 * in this chat session.
+				 */
+				else{
+					isSaved = true;
+					boolean isSaveSuccessful = false;
+					/* Chat room folder exists. Only chat history file needs to be appended with 
+					 *new chat information.
+					 */
+					if(hasSavedBefore(roomId)){
+						isSaveSuccessful = persistChatRoom(roomId);
+					}
+					/*
+					 * Chat room folder does not exist. A new folder is created dedicated to this room.
+					 */
+					else{
+						isSaveSuccessful = persistChatRoom(roomId);
+					}
+					
+					if(isSaveSuccessful == true){
+						notifyCertainUser("chatsaved", "text", username, "Chat has been saved successuflly!");
+					}else{
+						notifyCertainUser("chatsaved", "text", username, "NO updates made since last save.");
+					}
+					isUpdated = false;
+				}
+				Logger.of(ChatRoomActor.class).info("isSaved: " + isSaved + " isUpdated: " + isUpdated);
 			}else{
 				unhandled(msg);
 			}
@@ -256,7 +421,6 @@ public class ChatRoom{
 				ChatRoomManager.sendHeartBeat(new HeartBeat(chatRoomId, chatRoomActorRef), chatRoomActorRef);
 			}
 		}
-		
 		
 		/**
 		 * Broadcast message to all alive chat members.
@@ -267,7 +431,9 @@ public class ChatRoom{
 		public void notifyAll(String kind, String username, String msg){
 			for(WebSocket.Out<JsonNode> out: members.values()){
 				ObjectNode event = Json.newObject();
+				// key indicates the type of message.
 				event.put("key", "text");
+				// kind indicates the CSS class of message.
 				event.put("kind", kind);
 				// Joining or talking member's email address.
 				event.put("username", username);
@@ -280,7 +446,34 @@ public class ChatRoom{
 				out.write(event);
 			}
 		}
+		/**
+		 * Send a message to a certian chat member.
+		 * @param kind Message type.
+		 * @param username Chat member's email address.
+		 * @param msg Message.
+		 */
+		public void notifyCertainUser(String key, String kind, String username, String msg){
+			WebSocket.Out<JsonNode> out = members.get(username);
+			ObjectNode event = Json.newObject();
+			event.put("key", key);
+			event.put("kind", kind);
+			event.put("username", username);
+			event.put("text", msg);
+			out.write(event);
+		}
 	}// end ChatRoomActor
+	
+	private class UntypedActorCreator implements UntypedActorFactory{
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 4932693100022213825L;
+		
+		@Override
+		public Actor create() throws Exception {
+			return new ChatRoomActor();
+		}
+	}
 	
 	// -- messages
 	
@@ -325,11 +518,15 @@ public class ChatRoom{
 	public static class Quit{
 		// Member's email address.
 		private final String username;
+		// room id
+		private String roomId;
 		
-		public Quit(String usrname){
+		public Quit(String usrname, String id){
 			username = usrname;
+			roomId = id;
 		}
 		public String getUsername(){return username;}
+		public String getRoomId(){return roomId;}
 	}
 	/**
 	 * An HeartBeat message is sent to the ChatRoomManager periodically by each 
@@ -350,8 +547,14 @@ public class ChatRoom{
 	
 	public static class CloseRoom{
 		private ActorRef chatRoomActorRef;
-		public CloseRoom(ActorRef roomActorRef){chatRoomActorRef = roomActorRef;}
+		private String roomId;
+		
+		public CloseRoom(String id, ActorRef roomActorRef){
+			roomId = id;
+			chatRoomActorRef = roomActorRef;
+		}
 		public ActorRef getChatRoomActorRef(){return chatRoomActorRef;}
+		public String getRoomId(){return roomId;}
 	}
 	/**
 	 * A <i>History</i> message is sent by client to view the chat history
@@ -396,11 +599,32 @@ public class ChatRoom{
 		}
 	}
 	/**
+	 * A <i>SaveChat</i> message is sent by a chat member to save
+	 * by a current chat history. 
+	 * @author shichaodong
+	 * @version 1.0
+	 */
+	public static class SaveChat{
+		private String username;
+		private String roomId;
+		public SaveChat(String name, String id){
+			username = name;
+			roomId = id;
+		}
+		public String getRoomId(){return roomId;}
+		public String getUsername(){return username;}
+	}
+	
+	/**
 	 * One <i>ChatRecord</i> instance records one chat member's chat record 
 	 * @author shichaodong
 	 * @version 1.0
 	 */
-	public static class ChatRecord{
+	public static class ChatRecord implements Serializable{
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 8379865466312546408L;
 		//Time tag of this record
 		private String timeTag;
 		// Chat member's email address

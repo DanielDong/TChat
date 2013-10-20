@@ -77,7 +77,7 @@ public class ChatRoomManager extends UntypedActor{
 			// An already alive chat room sends this heart beat message
 			else{
 				ChatRoomUnit roomUnit = chatRooms.get(roomId);
-				updateEachChatRoom(roomId, roomUnit);
+				updateEachChatRoom(roomId, roomUnit, "heartbeat");
 			}
 			Logger.of(ChatRoomManager.class).info("Chat Room Manager - HeartBeat message received: " + message.getRoomId());
 		}else if(msg instanceof Probe){
@@ -86,7 +86,7 @@ public class ChatRoomManager extends UntypedActor{
 			while(iter.hasNext()){
 				long roomId = iter.next();
 				ChatRoomUnit roomUnit = chatRooms.get(roomId);
-				updateEachChatRoom(roomId, roomUnit);
+				updateEachChatRoom(roomId, roomUnit, "probe");
 			}
 			
 		}else{
@@ -99,18 +99,25 @@ public class ChatRoomManager extends UntypedActor{
 	 * @param roomId Chat room id.
 	 * @param roomUnit Chat room unit instance.
 	 */
-	private void updateEachChatRoom(long roomId, ChatRoomUnit roomUnit){
+	@SuppressWarnings("deprecation")
+	private void updateEachChatRoom(long roomId, ChatRoomUnit roomUnit, String msgType){
 		long lastTimeTag = roomUnit.getTimeTag();
 		long curTimeTag = System.currentTimeMillis();
 		// This chat room is not due.
 		if(curTimeTag - lastTimeTag < IDLE_MAX){
-			roomUnit.setTimeTag(System.currentTimeMillis());
-			Logger.of(ChatRoomManager.class).info("Chat Room Manager - chat room(" + roomId + ") TIME updated.");
+			if(msgType.equals("probe")){
+				Logger.of(ChatRoomManager.class).info("Chat Room Manager - chat room(" + roomId + ") TIME updated.[" +
+						(IDLE_MAX - curTimeTag + lastTimeTag) / 1000.0 + " seconds left]");
+			}else if(msgType.equals("heartbeat")){
+				roomUnit.setTimeTag(System.currentTimeMillis());
+				Logger.of(ChatRoomManager.class).info("Chat Room Manager - chat room(" + roomId + ") TIME updated.[NEW]");
+			}
+			
 		}
 		// This chat room is due and should be closed.
 		else{
 			// Remove all the chat members from the chat room.
-			roomUnit.getChatRoomActorRef().tell(new CloseRoom(roomUnit.getChatRoomActorRef()));
+			roomUnit.getChatRoomActorRef().tell(new CloseRoom(String.valueOf(roomId), roomUnit.getChatRoomActorRef()));
 			// Stop due chat room's ActorRef
 			Akka.system().stop(roomUnit.getChatRoomActorRef());
 			// Remove chat room instance from the chat room list.
