@@ -31,7 +31,7 @@
 				<h2>Messages:</h2>
 				<div id="messages" style="height:500px; overflow:auto; position: relative;">
 
-					<div id= "saveInfo"style="background-color: rgba(226, 220, 232, 0.6);width:100%; display:none;position:absolute;bottom:0px;z-index:100;height:20px;"></div>
+					<div id= "saveInfo"style="background-color: rgba(226, 220, 232, 0.6);width:100%; display:none; position:absolute; bottom:0px; z-index:100;height:20px;"></div>
 				</div>
 				<textarea id="chatInfo" style="width: 100%;margin-top:20px;" placeholder="Enter your text here. Hit enter key to send."></textarea>
 			</div>
@@ -107,7 +107,11 @@
 				}else if(data.key == "chatsaved"){
 					var saveMsg = data.text;
 					$("#saveInfo:hidden").text(saveMsg);
+					if($("#messages").scrollTop() > 0){
+						$("#saveInfo:hidden").css("top", $("#messages").height + $("#message").scrollTop() - $("#saveInfo:hidden").height());
+					}
 					$("#saveInfo:hidden").show('slow').delay(2000).hide('slow');
+					
 				}else if(data.key == "searchhistory"){
 					var newHistoryData = data.text;
 					var numOfMatches = data.numofmatch;

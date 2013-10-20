@@ -24,8 +24,6 @@ import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.node.ArrayNode;
 import org.codehaus.jackson.node.ObjectNode;
 
-import controllers.Application;
-
 import play.Logger;
 import play.Logger.ALogger;
 import play.libs.Akka;
@@ -41,13 +39,14 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.actor.UntypedActor;
 import akka.actor.UntypedActorFactory;
+import controllers.Application;
 
 public class ChatRoom implements Serializable{
 	
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = 3310140045862782665L;
+	private static final long serialVersionUID = -6504900111383200972L;
 
 	private static final ALogger LOG = Logger.of(ChatRoom.class);
 	
@@ -68,12 +67,19 @@ public class ChatRoom implements Serializable{
 	 */
 	private boolean isUpdated = false;
 	
+	private long timeTagVal;
+	
 	public long getRoomId(){return chatRoomId;}
 	public String getRoomName(){return chatRoomName;}
 	public ActorRef getRoomActorRef(){return chatRoomActorRef;}
 	public Queue<ChatRecord> getChatHistoryMap(){return chatHistory;}
 	public void setRoomActorRef(ActorRef actorRef){chatRoomActorRef = actorRef;}
+	public long getTimeTag(){return timeTagVal;}
+	public void setTimeTag(long tag){timeTagVal = tag;}
 	
+	// For returned chat members
+	public ChatRoom(long roomId){chatRoomId = roomId;}
+	// For a new chat room.
 	public ChatRoom(String roomName, long roomId, String[] memberList){
 		chatRoomName = roomName;
 		chatRoomId = roomId;
@@ -175,8 +181,8 @@ public class ChatRoom implements Serializable{
 	 * @return true to indicate this chat room has been saved before(a folder dedicated to this room has been already created); 
 	 * false to indicate this chat room is a fresh new one.
 	 */
-	private boolean hasSavedBefore(String roomId){
-		return new File(roomId).exists();
+	public static boolean hasSavedBefore(String chatRoomId){
+		return new File(String.valueOf(chatRoomId)).exists();
 	}
 	/**
 	 * Create a new chat room folder and store all related resources(image, uploaded files) to this folder.
@@ -190,19 +196,12 @@ public class ChatRoom implements Serializable{
 	 * @return File object pointing to the chat_history file to extract chat room name, member list and chat history.
 	 * @throws IOException 
 	 */
-	private boolean persistChatRoom(String roomId) throws IOException{
+	public boolean persistChatRoom(String roomId) throws IOException{
 		String fileSeparator = System.getProperty("file.separator");
 		File f1 = new File(roomId + fileSeparator + fileSeparator + "file");
-		if(f1.mkdirs() == false){
-			Logger.of(ChatRoomActor.class).info("chat room folder: " + roomId + fileSeparator + fileSeparator + "file" + " FAILed to be created.");
-			return false;
-		}
-		
-		File f2 = new File(roomId + fileSeparator + fileSeparator + "img");
-		if(f2.mkdirs() == false){
-			Logger.of(ChatRoomActor.class).info("chat room folder: " + roomId + fileSeparator + fileSeparator + "img" + " FAILed to be created.");
-			return false;
-		}
+		File f2 = new File(chatRoomId + fileSeparator + fileSeparator + "img");
+		f1.mkdirs();
+		f2.mkdirs();
 		
 		FileOutputStream fos = new FileOutputStream(roomId + fileSeparator + fileSeparator + "chatRoom.data");
 		ObjectOutputStream oos = new ObjectOutputStream(fos);
@@ -210,32 +209,45 @@ public class ChatRoom implements Serializable{
 		oos.flush();
 		oos.close();
 		return true;
-		
-//		File f3 = new File(roomId + fileSeparator + fileSeparator + "chat_history.txt");
-//		if(f3.createNewFile()){
-//			return f3;
-//		}else{
-//			Logger.of(ChatRoomActor.class).info("chat room file: " + roomId + fileSeparator + fileSeparator + "chat_history.txt" + " FAILed to be created.");
-//			return null;
-//		}
 	}
 	
 	/**
 	 * Read in the persisted chat room from disk.
-	 * @param roomId Room id (also name for the chat room folder)
-	 * @return true to indicate successfully reading in persisted chat room; otherwise false.
+	 * @return the chat room instance.
 	 * @throws IOException 
 	 * @throws ClassNotFoundException 
 	 */
-	private ChatRoom readPersistedChatRoom(String roomId) throws IOException, ClassNotFoundException{
+	public static ChatRoom readPersistedChatRoom(String chatRoomId) throws IOException, ClassNotFoundException{
 		String fileSeparator = System.getProperty("file.separator");
-		File f = new File(roomId + fileSeparator + fileSeparator + "chatRoom.data");
+		File f = new File(chatRoomId + fileSeparator + fileSeparator + "chatRoom.data");
 		// File exists and read in the persisted chat room.
 		if(f.exists()){
 			FileInputStream fis = new FileInputStream(f);
 			ObjectInputStream ois = new ObjectInputStream(fis);
 			ChatRoom chatRoom = (ChatRoom) ois.readObject();
-			chatRoom.setRoomActorRef(Akka.system().actorOf(new Props().withCreator(new UntypedActorCreator())));
+			
+			StringBuilder sb = new StringBuilder();
+			sb.append("persisted chat room id: " + chatRoom.getRoomId() + "\n");
+			sb.append("persisted chat room name: " + chatRoom.getRoomName() + "\n");
+			sb.append("persisted chat room isSaved: " + chatRoom.isSaved + "\n");
+			sb.append("persisted chat room isUpdated: " + chatRoom.isUpdated + "\n");
+			sb.append("persisted chat room member list size: " + chatRoom.membersList+ "\n");
+			sb.append("persisted chat history queue size: " + chatRoom.getChatHistoryMap() + "\n");
+			sb.append("persisted chat actor ref: " + chatRoom.getRoomActorRef());
+			Logger.of(ChatRoom.class).info(sb.toString());
+			
+			chatRoom.setRoomActorRef(Akka.system().actorOf(new Props().withCreator(chatRoom.new UntypedActorCreator())));
+			
+			sb = new StringBuilder();
+			sb.append("persisted chat room id: " + chatRoom.getRoomId() + "\n");
+			sb.append("persisted chat room name: " + chatRoom.getRoomName() + "\n");
+			sb.append("persisted chat room isSaved: " + chatRoom.isSaved + "\n");
+			sb.append("persisted chat room isUpdated: " + chatRoom.isUpdated + "\n");
+			sb.append("persisted chat room member list size: " + chatRoom.membersList+ "\n");
+			sb.append("persisted chat history queue size: " + chatRoom.getChatHistoryMap() + "\n");
+			sb.append("persisted chat actor ref: " + chatRoom.getRoomActorRef());
+			Logger.of(ChatRoom.class).info(sb.toString());
+			
 			return chatRoom;
 		}
 		// File does not exist.
@@ -251,18 +263,33 @@ public class ChatRoom implements Serializable{
 
 		@SuppressWarnings("deprecation")
 		@Override
-		public void onReceive(Object msg) throws Exception {
+		public void onReceive(Object msg) {
 			Date timeTag = new Date();
 			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-mm-dd hh:mm:ss");
 			String timeTagStr = sdf.format(timeTag);
 			
-			boolean isSendHeartBeat = false;
 			// A person tries to join this chat room.
 			if(msg instanceof Join){
-				isSendHeartBeat = true;
+				StringBuilder sb1 = new StringBuilder();
+				sb1.append("right after persisted in join chat room id: " + chatRoomId + "\n");
+				sb1.append("right after persisted in join chat room name: " + chatRoomName + "\n");
+				sb1.append("right after persisted in join chat room isSaved: " + isSaved + "\n");
+				sb1.append("right after persisted in join chat room isUpdated: " + isUpdated + "\n");
+				sb1.append("right after persisted in join chat room member list size: " + membersList + "\n");
+				sb1.append("right after persisted in join chat history queue size: " + chatHistory + "\n");
+				sb1.append("right after persisted in join chat actor ref: " + chatRoomActorRef);
+				Logger.of(ChatRoom.class).info(sb1.toString());
+				
 				
 				Join message = (Join) msg;
 				String username = message.getUsername();
+				
+				StringBuilder sb = new StringBuilder();
+				for(String str: membersList){
+					sb.append(str + " ");
+				}
+				
+				Logger.of(ChatRoomActor.class).info("member list of this chat room: " + sb.toString() + " joining username: " + username);
 				// Insertion point of this username in the membersList list.
 				int index = Arrays.binarySearch(membersList, username);
 				// This username does not occur in the membersList and 
@@ -285,11 +312,11 @@ public class ChatRoom implements Serializable{
 						addChatRecordToHistory(timeTagStr, username, "has joined this room.");
 					}
 				}
+				timeTagVal = System.currentTimeMillis();
 				isUpdated = true;
 			}
 			// A chat member send a message in the chat room.
 			else if(msg instanceof Talk){
-				isSendHeartBeat = true;
 					
 				Talk message = (Talk) msg;
 				String username = message.getUserName();
@@ -298,10 +325,10 @@ public class ChatRoom implements Serializable{
 				// Add talk chat record to chat history.
 				addChatRecordToHistory(timeTagStr, username, text);
 				isUpdated = true;
+				timeTagVal = System.currentTimeMillis();
 			}
 			// A member has quit from this chat room.
 			else if(msg instanceof Quit){
-				isSendHeartBeat = true;
 				
 				Quit message = (Quit) msg;
 				String username = message.getUsername();
@@ -311,10 +338,12 @@ public class ChatRoom implements Serializable{
 				// Add quit chat record to chat history.
 				addChatRecordToHistory(timeTagStr, username, "has left this room.");
 				isUpdated = true;
+				Logger.of(ChatRoomActor.class).info("ChatRoomActor members size: " + members.size());
 				// All chat members have left the chat room.
 				if(members.size() == 0){
 					chatRoomActorRef.tell(new CloseRoom(roomId, chatRoomActorRef), chatRoomActorRef);
 				}
+				timeTagVal = System.currentTimeMillis();
 			}
 			// Close a chat room which is idle longer than ChatRoomManager.IDLE_MAX milliseconds.
 			else if(msg instanceof CloseRoom){
@@ -328,11 +357,29 @@ public class ChatRoom implements Serializable{
 				}
 				
 				// Close the ActorRef of this chat room.
-				Akka.system().stop(message.getChatRoomActorRef());
+				if(closeRoomActorRef != null){
+					Akka.system().stop(message.getChatRoomActorRef());
+					chatRoomActorRef = null;
+					Logger.of(ChatRoomActor.class).info("Chat room actor ref is set to NULL......" + chatRoomActorRef);
+				}
 				// Persist this chat room.
-				persistChatRoom(roomId);
-				// Remove this chat room
-				Application.getChatRooms().remove(this);
+				try{
+					persistChatRoom(roomId);
+					Logger.of(ChatRoomActor.class).info("Chat room persisted on CloseRoom command......");
+				}catch(Exception e){
+					Logger.of(ChatRoomActor.class).info("persistChatRoom FAILed in CloseRoom: " + e.getMessage());
+				}
+				// Remove this chat room(list unchanged if this chat room has been removed)
+				Iterator<ChatRoom> iter = Application.getChatRooms().iterator();
+				while(iter.hasNext()){
+					ChatRoom room = iter.next();
+					if(room.getRoomId() == chatRoomId){
+						iter.remove();
+						break;
+					}
+				}
+				
+				Logger.of(ChatRoomActor.class).info("Chat room is removed from live chat room list......live chat room size: " + Application.getChatRooms().size());
 			}
 			// A chat member ask to see the chat history.
 			else if(msg instanceof History){
@@ -349,7 +396,7 @@ public class ChatRoom implements Serializable{
 				else{
 					Logger.of(ChatRoomActor.class).info(message.getUsername() +  "'s channel socket is lost.");
 				}
-				
+				timeTagVal = System.currentTimeMillis();
 			}
 			// Process a chat member's search chat history request.
 			else if(msg instanceof SearchHistory){
@@ -368,6 +415,7 @@ public class ChatRoom implements Serializable{
 					event.put("numofmatch", numOfMatches);
 					channel.write(event);
 				}
+				timeTagVal = System.currentTimeMillis();
 			}else if(msg instanceof SaveChat){
 				SaveChat message = (SaveChat) msg;
 				String username = message.getUsername();
@@ -376,7 +424,11 @@ public class ChatRoom implements Serializable{
 				if(isSaved == true){
 					// New updates have been made since last save.
 					if(isUpdated == true){
-						persistChatRoom(roomId);
+						try{
+							persistChatRoom(roomId);
+						}catch(Exception e){
+							Logger.of(ChatRoomActor.class).info("persistChatRoom FAILed in SaveChat(isSaved - isUpdated both true): " + e.getMessage());
+						}
 						// Command: chatsaved to indicate chat room has been saved.
 						notifyCertainUser("chatsaved", "text", username, "Chat has been saved successuflly!");
 						
@@ -390,19 +442,12 @@ public class ChatRoom implements Serializable{
 				 * in this chat session.
 				 */
 				else{
-					isSaved = true;
 					boolean isSaveSuccessful = false;
-					/* Chat room folder exists. Only chat history file needs to be appended with 
-					 *new chat information.
-					 */
-					if(hasSavedBefore(roomId)){
+
+					try{
 						isSaveSuccessful = persistChatRoom(roomId);
-					}
-					/*
-					 * Chat room folder does not exist. A new folder is created dedicated to this room.
-					 */
-					else{
-						isSaveSuccessful = persistChatRoom(roomId);
+					}catch(Exception e){
+						Logger.of(ChatRoomActor.class).info("persistChatRoom FAILed(folder does not exist): " + e.getMessage());
 					}
 					
 					if(isSaveSuccessful == true){
@@ -410,15 +455,13 @@ public class ChatRoom implements Serializable{
 					}else{
 						notifyCertainUser("chatsaved", "text", username, "NO updates made since last save.");
 					}
-					isUpdated = false;
+					
 				}
+				isUpdated = false;
+				timeTagVal = System.currentTimeMillis();
 				Logger.of(ChatRoomActor.class).info("isSaved: " + isSaved + " isUpdated: " + isUpdated);
 			}else{
 				unhandled(msg);
-			}
-			// Send heart beat message to ChatRoomManager.
-			if(isSendHeartBeat == true){
-				ChatRoomManager.sendHeartBeat(new HeartBeat(chatRoomId, chatRoomActorRef), chatRoomActorRef);
 			}
 		}
 		
@@ -565,15 +608,9 @@ public class ChatRoom implements Serializable{
 	public static class History{
 		// Chat member who issues this view history command
 		private String username;
-		// Corresponding out channel to this user.
-//		private WebSocket.Out<JsonNode> out;
-		
-//		public History(String name, WebSocket.Out<JsonNode> o){
 		public History(String name){
 			username = name;
-//			out = o;
 		}
-//		public WebSocket.Out<JsonNode> getOutChannel(){return out;}
 		public String getUsername(){return username;}
 		
 	}

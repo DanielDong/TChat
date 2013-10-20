@@ -2,6 +2,7 @@ package models;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -28,18 +29,16 @@ import controllers.Application;
  */
 public class ChatRoomManager extends UntypedActor{
 	
-	// The maximum idle time(milliseconds) for each chat room.
-	// An chat room whose idle time is longer than this IDLE_MAX value
-	// would be closed. i.e., corresponding chat room ActorRef is stopped
-	// and chat room instance is removed from the application. (by default 10 minutes)
+   /* The maximum idle time(milliseconds) for each chat room.
+	* An chat room whose idle time is longer than this IDLE_MAX value
+	* would be closed. i.e., corresponding chat room ActorRef is stopped
+	* and chat room instance is removed from the application. (by default 10 minutes)
+	*/
 	private static final long IDLE_MAX = 10 * 60000;
 	
 	private static ActorRef chatRoomManager = Akka.system().actorOf(new Props(ChatRoomManager.class), "ChatRoomManager");
 	
 	public static ActorRef getChatRoomManager(){return chatRoomManager;}
-	// key is room id, value is ChatRoomUnit instance
-	private Map<Long, ChatRoomUnit> chatRooms = new HashMap<Long, ChatRoomUnit>();
-	
 	/**
 	 * Start the periodic probe message sending process.
 	 */
@@ -53,43 +52,16 @@ public class ChatRoomManager extends UntypedActor{
 	            Akka.system().dispatcher()
 	        );
 	}
-	
-	/**
-	 * 
-	 * @param heartBeatMsg
-	 * @param chatRoomActorRef
-	 */
-	public static void sendHeartBeat(HeartBeat heartBeatMsg, ActorRef chatRoomActorRef){
-		chatRoomManager.tell(heartBeatMsg, chatRoomActorRef);
-	}
 
 	@SuppressWarnings("deprecation")
 	@Override
 	public void onReceive(Object msg) throws Exception {
-		if(msg instanceof HeartBeat){
-			HeartBeat message = (HeartBeat) msg;
-			long roomId = message.getRoomId();
-			ActorRef chatRoomActorRef = message.getChatRoomActorRef();
-			// A new chat room has been created.
-			if(chatRooms.keySet().contains(roomId) == false){
-				chatRooms.put(roomId, new ChatRoomUnit(chatRoomActorRef, System.currentTimeMillis()));
+		if(msg instanceof Probe){
+			for(ChatRoom room: Application.getChatRooms()){
+				updateChatRoom(room);
 			}
-			// An already alive chat room sends this heart beat message
-			else{
-				ChatRoomUnit roomUnit = chatRooms.get(roomId);
-				updateEachChatRoom(roomId, roomUnit, "heartbeat");
-			}
-			Logger.of(ChatRoomManager.class).info("Chat Room Manager - HeartBeat message received: " + message.getRoomId());
-		}else if(msg instanceof Probe){
-			Set<Long> roomIdSet = chatRooms.keySet();
-			Iterator<Long> iter = roomIdSet.iterator();
-			while(iter.hasNext()){
-				long roomId = iter.next();
-				ChatRoomUnit roomUnit = chatRooms.get(roomId);
-				updateEachChatRoom(roomId, roomUnit, "probe");
-			}
-			
-		}else{
+		}
+		else{
 			unhandled(msg);
 		}
 	}
@@ -100,57 +72,23 @@ public class ChatRoomManager extends UntypedActor{
 	 * @param roomUnit Chat room unit instance.
 	 */
 	@SuppressWarnings("deprecation")
-	private void updateEachChatRoom(long roomId, ChatRoomUnit roomUnit, String msgType){
-		long lastTimeTag = roomUnit.getTimeTag();
+	private void updateChatRoom(ChatRoom chatRoom){
 		long curTimeTag = System.currentTimeMillis();
-		// This chat room is not due.
+		long lastTimeTag = chatRoom.getTimeTag();
+		
+		// chatRoom is still eligible to live
 		if(curTimeTag - lastTimeTag < IDLE_MAX){
-			if(msgType.equals("probe")){
-				Logger.of(ChatRoomManager.class).info("Chat Room Manager - chat room(" + roomId + ") TIME updated.[" +
-						(IDLE_MAX - curTimeTag + lastTimeTag) / 1000.0 + " seconds left]");
-			}else if(msgType.equals("heartbeat")){
-				roomUnit.setTimeTag(System.currentTimeMillis());
-				Logger.of(ChatRoomManager.class).info("Chat Room Manager - chat room(" + roomId + ") TIME updated.[NEW]");
-			}
-			
+			Logger.of(ChatRoomManager.class).info("Chat Room Manager - chat room(" + chatRoom.getRoomId() + ") TIME updated.[" +
+					(IDLE_MAX - curTimeTag + lastTimeTag) / 1000.0 + " seconds left]");
 		}
-		// This chat room is due and should be closed.
+		// chatRoom needs to be removed.
 		else{
-			// Remove all the chat members from the chat room.
-			roomUnit.getChatRoomActorRef().tell(new CloseRoom(String.valueOf(roomId), roomUnit.getChatRoomActorRef()));
-			// Stop due chat room's ActorRef
-			Akka.system().stop(roomUnit.getChatRoomActorRef());
-			// Remove chat room instance from the chat room list.
-			List<ChatRoom> chatRoomList = Application.getChatRooms();
-			for(ChatRoom room: chatRoomList){
-				if(room.getRoomId() == roomId){
-					chatRoomList.remove(room);
-					chatRooms.remove(roomId);
-					Logger.of(ChatRoomManager.class).info("Chat Room Manager CLOSEes chat rooms: " + roomId);
-					break;
-				}
-			}
-			Logger.of(ChatRoomManager.class).info("Chat Room Manager TRIES TO CLOSE chat rooms: " + roomId);
-		}
-	}
-	
-	public static class ChatRoomUnit{
-		private ActorRef chatRoomActorRef;
-		private long timeTag;
-		
-		public ChatRoomUnit(ActorRef roomActorRef, long timetag){
-			chatRoomActorRef = roomActorRef;
-			timeTag = timetag;
-		}
-		
-		public ActorRef getChatRoomActorRef(){return chatRoomActorRef;}
-		public long getTimeTag(){return timeTag;}
-		public void setTimeTag(long newTimetag){
-			timeTag = newTimetag;
+			// Close this chat room first.
+			chatRoom.getRoomActorRef().tell(new CloseRoom(String.valueOf(chatRoom.getRoomId()), chatRoom.getRoomActorRef()));
+			Logger.of(ChatRoomManager.class).info("Chat Room Manager remove due chat room[probe]: " + chatRoom.getRoomId());
 		}
 	}
 	
 	// -- messages
 	public static class Probe{}
-
 }

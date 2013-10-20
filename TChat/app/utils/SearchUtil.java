@@ -10,11 +10,9 @@ public class SearchUtil {
 	 * @return formatted chat history with matches highlighted and the nubmer of matches.
 	 */
 	public static ArrayList<String> searchChatHistory(String target, String pattern){
-		String target1 = target.toLowerCase();
-		String pattern1 = pattern.toLowerCase();
 		
-		BoyerMoore bm = new BoyerMoore(target1, pattern1);
-		ArrayList<Integer> indexList = bm.bm();
+		ArrayList<Integer> indexList = searchByBM(target, pattern);
+		
 		ArrayList<String> retList = new ArrayList<String>();
 		// If only one element in indexList, no match.
 		if(indexList.size() == 1){
@@ -66,6 +64,14 @@ public class SearchUtil {
 //			System.out.print(retIList.get(i) + " ");
 //		System.out.println();
 //	}
+	
+	private static ArrayList<Integer> searchByBM(String target, String pattern){
+		String target1 = target.toLowerCase();
+		String pattern1 = pattern.toLowerCase();
+		
+		BoyerMoore bm = new BoyerMoore(target1, pattern1);
+		return bm.bm();
+	}
 	
 	/**
 	 * Boyer Moore String Searching algorithm similar to KMP. But it is more efficient than KMP.

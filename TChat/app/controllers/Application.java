@@ -2,27 +2,23 @@ package controllers;
 
 import static play.data.Form.form;
 
+import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-
 import models.ChatRoom;
-
 import org.codehaus.jackson.JsonNode;
 
 import play.Logger;
 import play.Logger.ALogger;
 import play.data.DynamicForm;
-import play.libs.Akka;
 import play.mvc.Controller;
 import play.mvc.Result;
 import play.mvc.WebSocket;
 import utils.MailUtil;
-import views.html.chatRoom;
 import views.html.index;
-import akka.actor.ActorRef;
-import akka.actor.Props;
 
 public class Application extends Controller {
 	
@@ -30,9 +26,9 @@ public class Application extends Controller {
 	private static final ALogger LOG = Logger.of(Application.class);
 	
 	// Contains all alive chat rooms.
-	private static List<ChatRoom> chatRooms = new ArrayList<ChatRoom>();
+	private static List<ChatRoom> chatRooms = Collections.synchronizedList(new ArrayList<ChatRoom>());
 	
-	public static List<ChatRoom> getChatRooms(){return chatRooms;}
+	public static synchronized List<ChatRoom> getChatRooms(){return chatRooms;}
 	
 	// -- Actions
 	
@@ -108,23 +104,57 @@ public class Application extends Controller {
     }
     
     /**
-     * A new member joins in the chat room by click on link in their email.
+     * A new member joins in the chat room by click on link in their email 
+     * -OR- a group of chat members return to an old chat room.
      * @param username This member's email address.
      * @param roomId The room id.
      * @return
      */
     public static Result joinChat(String username, String roomId){
-    	// Get the chat room corresponding to the room id
+    	// Get the chat room corresponding to the room id in the live chat room list.
     	ChatRoom targetChatRoom = null;
     	for(int i = 0; i < chatRooms.size(); i ++){
     		if(chatRooms.get(i).getRoomId() == Long.parseLong(roomId)){
     			targetChatRoom = chatRooms.get(i);
+    			Logger.of(Application.class).info("joinChat chat room is alive.");
     			break;
     		}
     	}
+
+    	/* Target chat room is not on the live chat room list.
+    	 * Check the persisted chat room list.
+    	 */
+    	if(targetChatRoom == null){
+    		// A folder dedicated to this chat room(room id) exists.
+    		if(ChatRoom.hasSavedBefore(roomId)){
+    			try {
+					targetChatRoom = ChatRoom.readPersistedChatRoom(roomId);
+					Logger.of(Application.class).info("joinChat chat room is read from disk[persisted read].");
+				} catch (IOException e) {
+					e.printStackTrace();
+					Logger.of(Application.class).info("Read in chat room(" + roomId + ") FAILed -  reading failed.");
+				} catch (ClassNotFoundException e) {
+					e.printStackTrace();
+					Logger.of(Application.class).info("Read in chat room(" + roomId + ") FAILed - reading failed");
+				}
+    		}
+    		// A folder dedicated to this chat room(room id) dose not exist.
+    		else{
+    			Logger.of(Application.class).info("Read in chat room(" + roomId + ") FAILed - folder does not exist");
+    		}
+    	}else{
+    		Logger.of(Application.class).info("A chat member TRIES to join in a live chat room.");
+    	}
+    	
+    	
     	if(targetChatRoom == null){
     		return badRequest("The chat room you want to join does not exist. :(");
     	}else{
+    		// Add this persisted chat room to Appication's chat room list.
+    		if(!chatRooms.contains(targetChatRoom)){
+    			chatRooms.add(targetChatRoom);
+    			Logger.of(Application.class).info("joinChat persisted chat room is made alive by being added to Application.chatRooms.");
+    		}
     		String roomName = targetChatRoom.getRoomName();
     		return ok(views.html.chatRoom.render(roomName, username, roomId));
     	}
@@ -139,7 +169,7 @@ public class Application extends Controller {
     	long roomId = 0;
     	do{
     		roomId = generator.nextLong();
-    	}while(isIdPresent(roomId));
+    	}while(roomId < 0 || isIdPresent(roomId));
     	return roomId;
     }
     /**

@@ -33,7 +33,7 @@ public class Admin extends Controller{
 				retList.add(members.get(i));
 			}
 		}
-		Logger.of(Admin.class).info("Admin room size: " + retList.size());
+		Logger.of(Admin.class).info("Admin room size: " + retList.size() + " live chat room list size: " + Application.getChatRooms().size());
 		return ok(views.html.admin.render(retList));
 	}
 }
